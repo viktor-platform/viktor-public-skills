@@ -1,0 +1,16 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "viktor-public-skills",
+  "description": "Skills for building, running, and reviewing VIKTOR engineering apps.",
+  "owner": {
+    "name": "VIKTOR",
+    "url": "https://github.com/viktor-platform"
+  },
+  "plugins": [
+    {
+      "name": "viktor-skills",
+      "source": "./",
+      "description": "Agent skills for building, repairing, and reviewing VIKTOR engineering apps."
+    }
+  ]
+}
