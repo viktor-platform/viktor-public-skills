@@ -52,4 +52,8 @@ Marketplace plugin skills are namespaced, so invoke the router with:
 /viktor-skills:viktor
 ```
 
+## GitHub Copilot
+
+Install the full skill pack from the VS Code or GitHub Copilot app interface. [GitHub Copilot installation guide](INSTALL.md#github-copilot)
+
 See [INSTALL.md](INSTALL.md) for Windows PowerShell, manual copy, update, and troubleshooting notes.

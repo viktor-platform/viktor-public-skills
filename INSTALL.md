@@ -44,6 +44,13 @@ Codex reads skills from agent-standard skill folders. The exact user folder can 
 
 ## Claude Code Marketplace
 
+<details>
+<summary>Watch the 30-second marketplace setup</summary>
+
+![Add the VIKTOR marketplace and try the skills in Claude](https://github.com/viktor-platform/viktor-public-skills/releases/download/docs-media/viktor-claude-skill-demo.gif)
+
+</details>
+
 Add the marketplace and install the plugin:
 
 ```text
@@ -57,6 +64,26 @@ Invoke the router:
 ```text
 /viktor-skills:viktor
 ```
+
+## GitHub Copilot
+
+### VS Code
+
+1. Open [Install VIKTOR Skills in VS Code](https://vscode.dev/redirect?url=vscode%3A%2F%2Fchat-plugin%2Finstall&source=viktor-platform%2Fviktor-public-skills&plugin=viktor-skills).
+2. In **Choose Where to Install Plugins**, select **Copilot** to install the skill pack for GitHub Copilot on this machine. Choose **VS Code** if you want VS Code to manage it for compatible agents in the editor.
+3. Confirm that the marketplace is `viktor-platform/viktor-public-skills` and the plugin is `viktor-skills`. Confirm the install.
+4. Open your app folder and start a new Copilot chat. Ask “Use the `viktor` skill to help me build and run this app.”
+
+If the link does not open the install dialog, run **Chat: Open Customizations** from the Command Palette. Select **Browse → Configure Marketplaces → Add Marketplace**. Enter `viktor-platform/viktor-public-skills`, return to **Browse**, and install `viktor-skills` from that marketplace. If plugin actions are missing, check `chat.plugins.enabled` in Settings. [VS Code plugin guide](https://code.visualstudio.com/docs/agent-customization/agent-plugins)
+
+### GitHub Copilot app
+
+1. Open **Customize** in the sidebar.
+2. Open the marketplace settings next to the marketplace dropdown. Add `viktor-platform/viktor-public-skills`.
+3. On **Browse**, search for `viktor-skills` and select **Install**.
+4. Start a new chat and ask “Use the `viktor` skill to help me build and run this app.”
+
+[GitHub Copilot app guide](https://docs.github.com/en/copilot/how-tos/github-copilot-app/customize-github-copilot-app#adding-a-plugin-marketplace)
 
 ## Windows PowerShell Without npx
 
