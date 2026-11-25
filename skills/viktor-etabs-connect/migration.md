@@ -2,6 +2,8 @@
 
 Use this guide when an existing VIKTOR app sends a Python script to `ETABSAnalysis`, and that script uses `comtypes` to control ETABS. Preserve the app's inputs, units, outputs, and engineering behavior. The APIs are beta; check the installed SDK and worker versions.
 
+For bulk table reads and imports, see the [ETABS table examples](examples.md) and [table reference](reference.md#database-tables). Keep the existing Python code that prepares table rows. Pass the `sap` from the VIKTOR session to the table functions in place of the COM model.
+
 Sources: [VIKTOR ETABS integration](https://docs.viktor.ai/docs/create-apps/software-integrations/etabs-and-sap2000/) and [ETABS SDK reference](https://docs.viktor.ai/sdk/api/external/etabs/).
 
 ## 1. Inventory the existing behavior
@@ -18,25 +20,13 @@ Sources: [VIKTOR ETABS integration](https://docs.viktor.ai/docs/create-apps/soft
 | Start a fresh app-owned model | `vkt.etabs.connect()` | Opens a new empty instance for the session. |
 | Work on an engineer's open model | `vkt.etabs.attach()` | Attaches to an existing instance; fails if none is running and leaves it open after detach. |
 
-Do not silently switch between modes. For attach, use a personal worker on the engineer's machine, open the intended model, and keep only one ETABS instance open. Never call `InitializeNewModel`, `File.NewBlank`, or other clearing operations on the attached model unless the user explicitly intends that change. A failed write can leave partial changes; inspect the model before retrying.
+For attach, use a personal worker on the engineer's machine, open the intended model, and keep only one ETABS instance open. Keep `InitializeNewModel`, `File.NewBlank`, and `File.NewGridOnly` in the fresh `connect()` path. A failed write can leave partial changes. Inspect the model before retrying.
 
 Use SDK 14.31.0 or later for `connect()` and 14.33.0 or later for `attach()`. Add `"etabsconnect"` to `worker_integrations` in `viktor.config.toml`; keep other required entries. Start the ETABS personal worker in VIKTOR Desktop on a licensed, interactive Windows session. Direct sessions do not require `comtypes` or Python on the worker. Keep the legacy `"etabs"` integration while a script path still needs it; remove it only after migration and verification.
 
 ## 3. Move the OAPI work into the app
 
-Before, the controller sends the script and files to a worker and reads `output.json`:
-
-```python
-analysis = vkt.etabs.ETABSAnalysis(
-    script=worker_script,
-    files=[("inputs.json", input_file)],
-    output_filenames=["output.json"],
-)
-analysis.execute(timeout=300)
-output_file = analysis.get_output_file("output.json")
-```
-
-After, put pure input preparation and result formatting in app-side functions. Put ETABS calls inside a session. The model returned by the context manager is the ETABS `SapModel`; do not call `CreateObject`, `ApplicationStart`, `ApplicationExit`, `CoInitialize`, or `CoUninitialize` for this session.
+Replace the script upload and `output.json` handoff with a controller-side session. Put input preparation and result formatting in app-side functions. Keep only ETABS calls and result reads inside the session. The context manager returns the ETABS `SapModel` and manages the session. Remove the old COM startup and shutdown calls from the migrated path.
 
 This small example reads a named frame from the open model. It replaces only that read operation; it is not a complete structural analysis or a replacement for existing reaction results.
 
@@ -50,7 +40,7 @@ def read_frame_points(frame_name: str) -> dict[str, str]:
             point_i, point_j, status = sap.FrameObj.GetPoints(frame_name, "", "")
             if status != 0:
                 raise vkt.UserError(f"ETABS could not read frame {frame_name} (status {status}).")
-            return {"frame": frame_name, "point_i": point_i, "point_j": point_j}
+            return {"frame": frame_name, "point_i": str(point_i), "point_j": str(point_j)}
     except vkt.errors.WorkerSessionAttachError as error:
         raise vkt.UserError("Open the ETABS model and start its personal worker, then try again.") from error
     except vkt.errors.WorkerSessionError as error:
