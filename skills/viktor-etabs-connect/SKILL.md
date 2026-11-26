@@ -19,7 +19,7 @@ Use this skill to build, read, or analyze ETABS models from VIKTOR and to migrat
 - `vkt.etabs.connect()` starts a fresh ETABS model for the session.
 - `vkt.etabs.attach()` binds to the ETABS model already open on the worker.
 - Use a `with` block and read the data needed by the VIKTOR view before it closes.
-- Keep one ETABS instance open for `attach()`. Use `connect()` for initialization and new model creation.
+- Keep one ETABS instance open for `attach()`. Use `connect()` when the app needs to start and initialize a new model.
 - Live edits can remain after a failure. Read the results before the session ends; session files cannot currently be returned to the app. The engineer saves their attached model.
 
 ## OAPI calls
@@ -32,6 +32,6 @@ Use this skill to build, read, or analyze ETABS models from VIKTOR and to migrat
 ## Load when needed
 
 - Read [reference.md](reference.md) for ETABS enums, C# call signatures, model details, database tables, and result extraction.
-- Read [examples.md](examples.md) for table reads, geometry imports, beam forces by station, and the complete 3D stick model viewer.
+- See [the beam app](examples.md#build-and-analyze-a-beam-in-an-open-etabs-model) for a complete build, analysis, and results table. Read [examples.md](examples.md) for geometry imports, beam forces by station, and the 3D stick model viewer.
 - Read [units-and-worker.md](units-and-worker.md) for present units, file limits, and session timeouts.
-- Read [migration.md](migration.md) when replacing an `ETABSAnalysis` and `comtypes` worker script with direct sessions.
+- Read [migration.md](migration.md) first when porting a standalone `comtypes` app or `ETABSAnalysis` script. It shows how to choose a session and preserve the source workflow.

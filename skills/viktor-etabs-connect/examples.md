@@ -79,7 +79,7 @@ def read_frame_points(frame_name: str) -> tuple[str, str]:
         raise vkt.UserError("Open the ETABS model and start its personal worker, then try again.") from error
 ```
 
-For a beam and column design app, read frame geometry and results in the attached session. Preserve load-case and unit labels for the design calculations. Do not assume the attached model is blank.
+For a beam and column design app, read frame geometry and results from the model already open. Preserve load-case and unit labels for the design calculations.
 
 ## Read support reactions and coordinates with `attach()`
 
@@ -158,6 +158,193 @@ def import_portal(table_versions: dict[str, int]) -> list[dict[str, str]]:
 ```
 
 Read back the member IDs and endpoints before assigning sections, releases, or loads. This example shows the migration pattern and needs a live worker check for the target ETABS version.
+
+## Build and analyze a beam in an open ETABS model
+
+Open one ETABS instance with a new, untitled **Grid Only** model. The beam in this example is at 3 m. Set the first story to that elevation, or change the Z coordinates of both joints to match the story elevation in your grid. Start the ETABS personal worker in VIKTOR Desktop. Use a new empty model for each run.
+
+Click **Build and analyze** to attach to the open model. The action imports the two points before it imports the beam. It adds fixed supports and a 5 kN/m gravity load over the 6 m span. The action saves the model to a relative filename so ETABS can run the analysis. The file is in the temporary worker folder. The **Support reactions** table reads the results stored by the action. Expect a vertical reaction of 15 kN at each support. [VIKTOR ETABS integration](https://docs.viktor.ai/docs/create-apps/software-integrations/etabs-and-sap2000/#attaching-to-a-running-instance) · [CSI analysis file requirement](https://docs.csiamerica.com/help-files/etabs-api-2015/html/ca865c06-25c7-d478-1fd8-45cc11891e5b.htm)
+
+Put these three files in the same app folder.
+
+### `viktor.config.toml`
+
+```toml
+app_type = "editor"
+python_version = "3.12"
+registered_name = "etabs-attach-beam"
+worker_integrations = ["etabsconnect"]
+```
+
+### `requirements.txt`
+
+```text
+viktor==14.38.0
+```
+
+### `app.py`
+
+```python
+import json
+from typing import Any
+
+import viktor as vkt
+
+
+START = "900001"
+END = "900002"
+BEAM = "910001"
+CASE = "BEAM_LIVE"
+
+
+def check(status: Any, operation: str) -> None:
+    code = int(status)
+    if code != 0:
+        raise vkt.UserError(f"ETABS failed to {operation} ({code}).")
+
+
+def import_table(
+    sap: Any, key: str, fields: list[str], rows: list[tuple[str, ...]],
+) -> None:
+    db = sap.DatabaseTables
+    version, *_, status = db.GetAllFieldsInTable(key, 0, 0, [], [], [], [], [])
+    check(status, f"read the version of {key}")
+    check(db.CancelTableEditing(), "clear staged table edits")
+    cells = [cell for row in rows for cell in row]
+    _, _, _, status = db.SetTableForEditingArray(key, int(version), fields, len(rows), cells)
+    check(status, f"stage {key}")
+    fatal, errors, _, _, log, status = db.ApplyEditedTables(True, 0, 0, 0, 0, "")
+    check(status, f"apply {key}")
+    if int(fatal) or int(errors):
+        raise vkt.UserError(f"ETABS could not import {key}. {str(log)[-500:]}")
+
+
+def build_beam(sap: Any) -> None:
+    check(sap.SetPresentUnits(vkt.etabs.eUnits.kN_m_C), "set units to kN and m")
+
+    import_table(
+        sap, "Point Object Connectivity", ["UniqueName", "X", "Y", "Z", "IsSpecial"],
+        [(START, "0", "0", "3", "Yes"), (END, "6", "0", "3", "Yes")],
+    )
+    import_table(
+        sap, "Beam Object Connectivity", ["UniqueName", "UniquePtI", "UniquePtJ"],
+        [(BEAM, START, END)],
+    )
+
+    material, section = "DEMO_CONCRETE", "DEMO_BEAM"
+    check(sap.PropMaterial.SetMaterial(material, vkt.etabs.eMatType.Concrete), "add concrete")
+    check(sap.PropMaterial.SetMPIsotropic(material, 30_000_000, 0.2, 1e-5), "set stiffness")
+    check(sap.PropFrame.SetRectangle(section, material, 0.3, 0.3), "add beam section")
+    check(sap.FrameObj.SetSection(BEAM, section), "assign beam section")
+
+    for joint in (START, END):
+        _, status = sap.PointObj.SetRestraint(joint, [True] * 6, vkt.etabs.eItemType.Objects)
+        check(status, f"fix joint {joint}")
+
+    check(sap.LoadPatterns.Add(CASE, vkt.etabs.eLoadPatternType.Live, 0.0, True), "add live load")
+    # Type 1 is force per length. Direction 10 is gravity.
+    check(
+        sap.FrameObj.SetLoadDistributed(BEAM, CASE, 1, 10, 0.0, 1.0, 5.0, 5.0, "Global", True, True),
+        "apply 5 kN/m to the beam",
+    )
+
+
+def analyze(sap: Any) -> None:
+    check(sap.File.Save("beam-demo.edb"), "save the untitled model")
+    check(sap.Analyze.SetRunCaseFlag("", False, True), "clear analysis case flags")
+    check(sap.Analyze.SetRunCaseFlag(CASE, True, False), f"select {CASE} for analysis")
+    check(sap.Analyze.RunAnalysis(), "run analysis")
+
+    _, names, statuses, status = sap.Analyze.GetCaseStatus(0, [], [])
+    check(status, "read analysis status")
+    if dict(zip(names, statuses, strict=True)).get(CASE) != 4:
+        raise vkt.UserError(f"ETABS did not finish {CASE}.")
+
+
+def read_reactions(sap: Any) -> list[list[str | float]]:
+    db = sap.DatabaseTables
+    _, status = db.SetLoadCasesSelectedForDisplay([CASE])
+    check(status, f"select {CASE} for results")
+    _, status = db.SetLoadCombinationsSelectedForDisplay([])
+    check(status, "clear result combination selection")
+
+    _, _, columns, count, cells, status = db.GetTableForDisplayArray(
+        "Joint Reactions", [""], "", 0, [], 0, [],
+    )
+    check(status, "read joint reactions")
+    fields, values = list(columns or []), list(cells or [])
+    width = len(fields)
+    if not {"UniqueName", "OutputCase", "FZ"} <= set(fields) or len(values) != int(count) * width:
+        raise vkt.UserError("ETABS returned an incomplete Joint Reactions table.")
+
+    rows = []
+    for index in range(0, len(values), width):
+        row = dict(zip(fields, values[index:index + width], strict=True))
+        if row["OutputCase"] == CASE:
+            rows.append([str(row["UniqueName"]), float(row["FZ"])])
+    if not rows:
+        raise vkt.UserError(f"ETABS returned no support reactions for {CASE}.")
+    return rows
+
+
+class Parametrization(vkt.Parametrization):
+    instructions = vkt.Text(
+        "Open a fresh, untitled ETABS Grid Only model with its first story at 3 m. "
+        "Start the ETABS personal worker, then select **Build and analyze**."
+    )
+    run = vkt.SetParamsButton("Build and analyze", method="run_beam", longpoll=True)
+    reactions = vkt.HiddenField("Support reactions")
+
+
+class Controller(vkt.Controller):
+    parametrization = Parametrization
+
+    def run_beam(self, params, **kwargs):
+        try:
+            with vkt.etabs.attach(timeout=120) as sap:
+                build_beam(sap)
+                analyze(sap)
+                rows = read_reactions(sap)
+        except vkt.errors.WorkerSessionAttachError as error:
+            raise vkt.UserError(
+                f"Could not attach to ETABS ({error.reason}). "
+                "Open the empty model and start the ETABS personal worker."
+            ) from error
+        return vkt.SetParamsResult({"reactions": json.dumps(rows)})
+
+    @vkt.TableView("Support reactions")
+    def show_reactions(self, params, **kwargs):
+        rows = json.loads(params.reactions or "[]")
+        return vkt.TableResult(
+            rows or [["Select Build and analyze", ""]],
+            column_headers=["ETABS joint", "Vertical reaction [kN]"],
+            show_index=False,
+        )
+```
+
+### Run the app
+
+For a new VIKTOR app, register it from the app folder and start it. Open the URL printed by the CLI and select **Build and analyze**. [VIKTOR CLI reference](https://docs.viktor.ai/docs/create-apps/references/cli/)
+
+```bash
+viktor-cli create-app "ETABS attach beam" --registered-name etabs-attach-beam
+viktor-cli clean-start
+```
+
+### Run the same example with `connect()`
+
+`connect()` starts a separate ETABS instance on the configured worker. Use `worker_integrations = ["etabsconnect"]` in the app config. Initialize the model in kN and m and create a one-story grid at 3 m to match the beam coordinates. Replace `Controller.run_beam` with the method below. In the app instructions, tell the user to start the ETABS worker and select **Build and analyze**. The button calls the same model builder, analysis, and results functions. [VIKTOR ETABS SDK](https://docs.viktor.ai/sdk/api/external/etabs/#connect) · [CSI Grid Only API](https://docs.csiamerica.com/help-files/etabs-api-2016/html/cb79539c-729f-7231-1625-b8f15e018e1f.htm)
+
+```python
+def run_beam(self, params, **kwargs):
+    with vkt.etabs.connect(timeout=120) as sap:
+        check(sap.InitializeNewModel(vkt.etabs.eUnits.kN_m_C), "initialize the model")
+        check(sap.File.NewGridOnly(1, 3, 3, 2, 2, 6, 4), "create the grid model")
+        build_beam(sap)
+        analyze(sap)
+        rows = read_reactions(sap)
+    return vkt.SetParamsResult({"reactions": json.dumps(rows)})
+```
 
 ## Read beam forces by station
 

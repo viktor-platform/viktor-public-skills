@@ -5,7 +5,7 @@
 ETABS stores data in its database units. The API converts values to the model's present units as needed. Use `GetPresentUnits()` for the unit code to carry with coordinates and results. Use `GetDatabaseUnits()` only when you need the internal storage units. [CSI model API](https://docs.csiamerica.com/help-files/etabs-api-2016/html/15293a27-a035-e64b-a4b4-78356479aa98.htm)
 
 - **New model with `connect()`**. Pass an explicit unit enum to `InitializeNewModel`, such as `vkt.etabs.eUnits.kN_m_C`. Use that unit system for coordinates, section dimensions, loads, and numeric geometry table cells. With `kN_mm_C`, enter a 6 m span as `6000`.
-- **Open model with `attach()`**. Read the present units and keep them with the data returned to the app. The stick model viewer plots coordinates in the open model's current units. If a calculation requires temporary working units, save the unit code, check `SetPresentUnits`, and restore the original units in a `finally` block while the session is open. `SetPresentUnits` changes the units shown in the attached ETABS window. [CSI present units](https://docs.csiamerica.com/help-files/etabs-api-2016/html/c4cad3c9-d648-a353-d37c-2bb4f57b4d71.htm) · [ETABS SDK unit enums](https://docs.viktor.ai/sdk/api/external/etabs/#eunits)
+- **Open model with `attach()`**. For a viewer, read the present units and keep them with the data returned to the app. For a port, preserve the source app's unit setup. A source call to `SetPresentUnits` also changes the units shown in the attached ETABS window. [CSI present units](https://docs.csiamerica.com/help-files/etabs-api-2016/html/c4cad3c9-d648-a353-d37c-2bb4f57b4d71.htm) · [ETABS SDK unit enums](https://docs.viktor.ai/sdk/api/external/etabs/#eunits)
 
 | Quantity | With `kN_m_C` | With `kN_mm_C` |
 | --- | --- | --- |
@@ -40,11 +40,11 @@ Declare `worker_integrations = ["etabsconnect"]` in `viktor.config.toml`. Use a 
 | `connect()` | Starts a fresh ETABS instance for the session. Use this mode to initialize or build a model. |
 | `attach()` | Uses ETABS on the same Windows machine as the personal worker. Keep one ETABS instance open. The app cannot select among several windows. The instance stays open when the session ends. |
 | Save a session model | Use a relative filename such as `model.edb`. The worker rejects absolute paths and writes within a temporary session folder, which it removes after the session. The wrapper cannot return the `.edb` to the app. |
-| Save an attached model | The engineer saves it in ETABS. A `File.Save` call through the wrapper targets the temporary session folder. |
+| Analyze an attached untitled model | Call `File.Save` with a relative filename before `RunAnalysis`. ETABS uses that temporary file path for the analysis. The engineer can save a permanent copy in ETABS. |
 | Read results | Read geometry, tables, and results while the `with` block is open. Copy the values into plain Python data before using them in views, calculations, or downloads. |
 | Timeouts | `timeout` applies to each call or group of deferred calls. In `attach()` it also bounds the bind. Allow at least 30 seconds for the full bind window. |
 
-In SDK 14.37.0 and later, deferred calls are enabled by default. Read a returned value to resolve it. Set `defer=False` to send each call immediately. Use bulk table calls where they fit the task. `sap.batch()` requires `defer=True`. Read its results after the batch block ends. If a session is lost, open a new one and check the model state before retrying a write. [VIKTOR ETABS SDK](https://docs.viktor.ai/sdk/api/external/etabs/) · [VIKTOR worker setup and file limits](https://docs.viktor.ai/docs/create-apps/software-integrations/etabs-and-sap2000/)
+In SDK 14.37.0 and later, deferred calls are enabled by default. Read a returned value to resolve it. Keep the source order of calls and status checks during a port. If a session is lost, open a new one and check the model state before retrying a write. [VIKTOR ETABS SDK](https://docs.viktor.ai/sdk/api/external/etabs/) · [VIKTOR worker setup and file limits](https://docs.viktor.ai/docs/create-apps/software-integrations/etabs-and-sap2000/)
 
 ### Attach errors
 
