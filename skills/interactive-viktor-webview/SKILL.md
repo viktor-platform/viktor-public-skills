@@ -16,7 +16,7 @@ This is the user-driven complement to agent-driven Storage toggles. Use this whe
 3. Add hidden receiving fields to `Parametrization`. Match each scalar to its field type, such as `IntegerField(visible=False)` for a whole-number dimension. Use `TextAreaField(visible=False)` for JSON strings.
 4. In the controller, read the hidden fields from `params`, parse and validate them, and inject the current state into the HTML as escaped JSON.
 5. Load the VIKTOR JavaScript SDK from `VIKTOR_JS_SDK_PATH + "v1.js"` with a script tag in the HTML head.
-6. Call `viktorSdk.sendParams(values)` from a button click. Pass `true` as the second argument only to skip the confirmation dialog.
+6. Apply edits with a `type="button"` click that calls `viktorSdk.sendParams(values)`. If porting a page with a `<form>`, cancel its native submit. Use valid `input` events to redraw any live preview before Apply. Pass `true` as the second SDK argument only to skip confirmation.
 7. Treat the call as a request to update the editor. The SDK returns no confirmation. Verify the field values in the VIKTOR editor and in the next calculation.
 8. Re-read the hidden params in normal VIKTOR views or compute methods and convert the JSON/string values back into typed Python data.
 9. Keep all dynamic HTML injection safe: use `json.dumps`, escape `</`, and do not interpolate user-provided HTML.

@@ -21,9 +21,14 @@ The CDN configuration in the example uses jsDelivr and Three.js 0.185.1. This co
 
 1. Put the canvas and view buttons in the left column. Put the dimension fields and **Apply to VIKTOR** in the right column. Let the canvas resize with the VIKTOR split pane.
 2. Declare one hidden `IntegerField` or `NumberField` for each editable dimension. Use the same field paths in the JSON payload and the SDK call.
-3. Update the preview from valid edits in the browser. Dispose of the old mesh geometries when you build replacements.
-4. Load the VIKTOR JavaScript SDK in the HTML head. Call `viktorSdk.sendParams` from the Apply button. Read the applied values in the controller on the next view load. See [Interactive VIKTOR WebView](../interactive-viktor-webview/SKILL.md).
+3. On `input`, read the draft dimensions and update the preview for valid edits. Redraw geometry and any load arrows that depend on it. Dispose of the old mesh geometries when you build replacements.
+4. Load the VIKTOR JavaScript SDK in the HTML head. Use an Apply button with `type="button"` and call `viktorSdk.sendParams` from its click handler. Read the applied values in the controller on the next view load. See [Interactive VIKTOR WebView](../interactive-viktor-webview/SKILL.md).
 5. Keep the load table in the native VIKTOR input panel and read it in the Results DataView. The base plate example shows this flow. See [examples.md](examples.md).
+
+### Preview stays still or Apply does nothing
+
+- If the model stays still while the user types, verify that the `input` handler calls the scene's redraw function with valid draft values. The scene update can use the same geometry functions as the standalone app.
+- If the iframe console mentions `Blocked form submission` or `allow-forms`, use the SDK click handler for Apply and cancel native submission on any retained form. If Enter applies values, send it through the same click handler. See the [sandbox example](../interactive-viktor-webview/reference.md#blocked-form-submission).
 
 ## Verify in the target app
 

@@ -129,10 +129,45 @@ Treat WebView HTML as sandboxed.
 
 - Do not depend on outbound browser requests for core behavior.
 - Avoid loading external scripts or stylesheets dynamically.
-- Use a button click to call the SDK. A sandboxed iframe can block normal HTML form submission.
 - Inline critical CSS and JavaScript, or load local/static assets according to the base VIKTOR WebView skill.
 - Do not interpolate untrusted user-provided HTML.
 - The documented browser-to-VIKTOR path is `viktorSdk.sendParams(...)`.
+
+### Blocked form submission
+
+If Apply does nothing and the iframe console reports `Blocked form submission` and `allow-forms`, check the button type. An HTML form copied from a standalone app can still try to submit when a user clicks a submit button or presses Enter. Give Apply `type="button"` and call `viktorSdk.sendParams` in the click handler. If the layout still uses a `<form>`, cancel its `submit` event. Route Enter to the same Apply click when you want it to apply the fields. [HTML iframe sandbox](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox) · [VIKTOR JavaScript SDK](https://docs.viktor.ai/docs/create-apps/results-and-visualizations/html/)
+
+Update a live preview on valid `input` events. Apply sends the edited values to the VIKTOR editor. The example below uses a hidden integer field named `span_mm` in VIKTOR and assumes the page has already loaded the SDK.
+
+```html
+<form id="geometry-form">
+  <label for="span">Span (mm)</label>
+  <input id="span" type="number" min="1" step="1" value="6000" required>
+  <output id="draft-span" for="span">6000 mm</output>
+  <button id="apply-span" type="button">Apply to VIKTOR</button>
+</form>
+<script>
+  const form = document.getElementById("geometry-form");
+  const span = document.getElementById("span");
+  const preview = document.getElementById("draft-span");
+  const apply = document.getElementById("apply-span");
+
+  form.addEventListener("submit", (event) => event.preventDefault());
+  span.addEventListener("input", () => {
+    if (span.validity.valid) preview.value = `${span.valueAsNumber} mm`;
+  });
+  apply.addEventListener("click", () => {
+    if (span.validity.valid) window.viktorSdk.sendParams({ span_mm: span.valueAsNumber });
+  });
+  span.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    event.preventDefault();
+    apply.click();
+  });
+</script>
+```
+
+In the target VIKTOR iframe, edit a valid value and check that the preview updates. Then test Apply and Enter and confirm the new value in the editor.
 
 ## Related Patterns
 
